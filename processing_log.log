@@ -1,0 +1,35 @@
+2025-07-26 00:50:30,167 - INFO - --- Starting Full Process ---
+2025-07-26 00:50:30,168 - INFO - --- Processing PDF: file01.pdf ---
+2025-07-26 00:50:30,175 - INFO - Starting visual title extraction...
+2025-07-26 00:50:30,190 - INFO - Extracted title: 'Application form for grant of LTC advance'
+2025-07-26 00:50:30,191 - INFO - Attempting to extract outline from bookmarks...
+2025-07-26 00:50:30,191 - WARNING - Call to doc.get_toc() returned no data. This document may have no bookmarks.
+2025-07-26 00:50:30,191 - INFO - Final decision: No valid bookmark data found. Using empty outline.
+2025-07-26 00:50:30,193 - INFO - --- Processing PDF: file02.pdf ---
+2025-07-26 00:50:30,207 - INFO - Starting visual title extraction...
+2025-07-26 00:50:30,220 - INFO - Extracted title: 'Overview Foundation Level Extensions'
+2025-07-26 00:50:30,221 - INFO - Attempting to extract outline from bookmarks...
+2025-07-26 00:50:30,221 - WARNING - Call to doc.get_toc() returned no data. This document may have no bookmarks.
+2025-07-26 00:50:30,221 - INFO - Final decision: No valid bookmark data found. Using empty outline.
+2025-07-26 00:50:30,223 - INFO - --- Processing PDF: file03.pdf ---
+2025-07-26 00:50:30,238 - INFO - Starting visual title extraction...
+2025-07-26 00:50:30,255 - INFO - Extracted title: 'RFP: R RFP: R RFP: R RFP: Request f quest f quest f quest for Pr r Pr r Pr r Proposal oposal oposal oposal'
+2025-07-26 00:50:30,255 - INFO - Attempting to extract outline from bookmarks...
+2025-07-26 00:50:30,255 - WARNING - Call to doc.get_toc() returned no data. This document may have no bookmarks.
+2025-07-26 00:50:30,256 - INFO - Final decision: No valid bookmark data found. Using empty outline.
+2025-07-26 00:50:30,257 - INFO - --- Processing PDF: file04.pdf ---
+2025-07-26 00:50:30,263 - INFO - Starting visual title extraction...
+2025-07-26 00:50:30,312 - INFO - Extracted title: 'Parsippany -Troy Hills STEM Pathways'
+2025-07-26 00:50:30,312 - INFO - Attempting to extract outline from bookmarks...
+2025-07-26 00:50:30,313 - INFO - SUCCESS: Found TOC with 4 entries.
+2025-07-26 00:50:30,313 - INFO - TOC format is: list
+2025-07-26 00:50:30,313 - INFO - Successfully processed 4 entries from bookmarks.
+2025-07-26 00:50:30,313 - INFO - Final decision: Using outline generated from bookmarks.
+2025-07-26 00:50:30,315 - INFO - --- Processing PDF: file05.pdf ---
+2025-07-26 00:50:30,319 - INFO - Starting visual title extraction...
+2025-07-26 00:50:30,332 - INFO - Extracted title: 'HOPE To SEE You THERE!'
+2025-07-26 00:50:30,333 - INFO - Attempting to extract outline from bookmarks...
+2025-07-26 00:50:30,333 - INFO - SUCCESS: Found TOC with 1 entries.
+2025-07-26 00:50:30,333 - INFO - TOC format is: list
+2025-07-26 00:50:30,333 - INFO - Successfully processed 1 entries from bookmarks.
+2025-07-26 00:50:30,333 - INFO - Final decision: Using outline generated from bookmarks.

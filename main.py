@@ -1,118 +1,129 @@
 import fitz  # PyMuPDF
 import json
 import os
-import collections
 import re
+from collections import Counter, defaultdict
+import logging
 
-# --- Configuration ---
-INPUT_DIR = "/app/input"
-OUTPUT_DIR = "/app/output"
-HEADING_LEVELS = 3
-HEADING_SIZE_FACTOR = 1.1
-PAGE_MARGIN_TOP = 0.12
-PAGE_MARGIN_BOTTOM = 0.12
-NEGATIVE_KEYWORDS = [
-    'figure', 'table', 'university', 'department', 'institute',
-    'inc.', 'llc', 'copyright', 'issn', 'editor', 'author',
-    'reviewed by', 'letter from', 'in this issue', 'continued', 'www.'
-]
+# -- Setup detailed logging --
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s', filename='final_processing_log.log', filemode='w')
 
-def consolidate_outline(outline):
-    if not outline:
-        return []
-    consolidated = []
-    current_heading = outline[0]
-    for i in range(1, len(outline)):
-        next_heading = outline[i]
-        if (next_heading['page'] == current_heading['page'] and
-            next_heading['level'] == current_heading['level']):
-            current_heading['text'] += " " + next_heading['text']
+def clean_text(text: str) -> str:
+    """A robust function to clean text from PDF extraction."""
+    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
+    text = text.replace('ﬁ', 'fi').replace('ﬂ', 'fl')
+    return " ".join(text.split()).strip()
+
+def get_outline_from_toc(doc: fitz.Document) -> tuple[str, list] | None:
+    """PRIMARY STRATEGY: Build title and outline from bookmarks. Fully crash-proof."""
+    toc = doc.get_toc(simple=False)
+    if not toc:
+        logging.warning(f"For '{os.path.basename(doc.name)}', no bookmarks found or call to library failed.")
+        return None
+        
+    logging.info(f"For '{os.path.basename(doc.name)}', SUCCESS: Found bookmarks. Using high-fidelity TOC strategy.")
+    outline, is_dict_format = [], isinstance(toc[0], dict)
+    
+    if is_dict_format:
+        top_level = [item['title'] for item in toc if item.get('level') == 1]
+    else:
+        top_level = [item[1] for item in toc if len(item) > 1 and item[0] == 1]
+    title = clean_text(" ".join(top_level[:2]))
+
+    base_level = toc[0]['level'] if is_dict_format else toc[0][0]
+    for item in toc:
+        if is_dict_format:
+            level, text, page = item.get('level', 1), item.get('title', ''), item.get('page', 1) - 1
         else:
-            consolidated.append(current_heading)
-            current_heading = next_heading
-    consolidated.append(current_heading)
-    return consolidated
-
-def is_valid_heading(line_text):
-    text_lower = line_text.lower()
-    if not text_lower.strip() or len(text_lower) > 200:
-        return False
-    if any(keyword in text_lower for keyword in NEGATIVE_KEYWORDS):
-        return False
-    if re.search(r'\S+@\S+', text_lower):
-        return False
-    return True
-
-def process_pdf(pdf_path):
-    with fitz.open(pdf_path) as doc:
-        all_lines = []
-        font_sizes = collections.defaultdict(int)
-
-        for page_num, page in enumerate(doc):
-            page_height = page.rect.height
-            body_top = page_height * PAGE_MARGIN_TOP
-            body_bottom = page_height * (1 - PAGE_MARGIN_BOTTOM)
+            if len(item) < 3: continue
+            level, text, page = item[0], item[1], item[2] - 1
+        if clean_text(text):
+            outline.append({"level": f"H{level - base_level + 1}", "text": clean_text(text), "page": page})
             
-            blocks = page.get_text("dict", flags=fitz.TEXTFLAGS_DICT)["blocks"]
-            for block in blocks:
-                if block["type"] == 0:  # Text block
-                    for line in block["lines"]:
-                        # Check if line is within the body margin
-                        line_y = line['bbox'][1]
-                        if body_top < line_y < body_bottom:
-                            line_text = " ".join(span['text'] for span in line['spans']).strip()
-                            if line_text:
-                                first_span = line['spans'][0]
-                                all_lines.append({
-                                    "text": line_text,
-                                    "size": first_span['size'],
-                                    "page": page_num # Use 0-indexed page number
-                                })
-                                font_sizes[round(first_span['size'])] += len(line_text)
+    return title, outline
+
+def reconstruct_document_from_layout(doc: fitz.Document) -> tuple[str, list]:
+    """FALLBACK ENGINE: A powerful document reconstructor that analyzes and clusters font styles."""
+    logging.warning(f"For '{os.path.basename(doc.name)}', executing ADVANCED layout reconstruction.")
+    
+    # Pass 1: Intelligent Title Extraction from Page 1
+    title, title_parts = "", set()
+    if doc.page_count > 0:
+        page = doc[0]
+        # Get blocks from the top half, sorted by reading order (top to bottom)
+        blocks = sorted([b for b in page.get_text("dict")["blocks"] if 'lines' in b and b['bbox'][3] < page.rect.height * 0.5], key=lambda b: b['bbox'][1])
+        if blocks:
+            # Find the most prominent font size in the title area
+            max_font_size = max(s["size"] for b in blocks for l in b["lines"] for s in l["spans"])
+            # The title is made of lines with prominent fonts
+            title_lines = [clean_text(" ".join(s["text"] for s in l["spans"])) for b in blocks for l in b["lines"] if abs(l["spans"][0]["size"] - max_font_size) < 10]
+            title = " ".join(title_lines)
+            title_parts = set(title_lines)
+
+    # Pass 2: Profile font styles across the entire document
+    style_counts, lines_with_style = Counter(), []
+    for page_num, page in enumerate(doc):
+        for block in page.get_text("dict", sort=True)["blocks"]:
+            for line in block.get("lines", []):
+                if line.get("spans"):
+                    span = line["spans"][0]
+                    text = clean_text(" ".join(s["text"] for s in line["spans"]))
+                    if not text or len(text) < 3: continue
+                    is_bold = "bold" in span["font"].lower()
+                    style = (round(span["size"]), is_bold)
+                    lines_with_style.append({"text": text, "style": style, "page": page_num})
+                    style_counts[style] += len(text)
+    
+    # Pass 3: Deduce hierarchy
+    if not style_counts: return title, []
+    body_style = style_counts.most_common(1)[0][0]
+    heading_styles = [s for s in style_counts if s[0] > body_style[0]]
+    heading_styles.sort(key=lambda s: s[0], reverse=True)
+    level_map = {style: f"H{i+1}" for i, style in enumerate(heading_styles[:6])}
+
+    # Pass 4: Construct the outline with correct filtering
+    outline, processed = [], {title, *title_parts}
+    for line in lines_with_style:
+        if line["style"] in level_map and line["text"] not in processed:
+             if not re.match(r"^\d+$", line["text"]) and not re.match(r"page \d+", line["text"], re.IGNORECASE):
+                outline.append({"level": level_map[line["style"]], "text": line["text"], "page": line["page"]})
+                processed.add(line["text"])
+    
+    return title, outline
+
+def process_pdf(pdf_path: str) -> dict | None:
+    """Main orchestrator with a robust hierarchical fallback strategy."""
+    logging.info(f"--- Processing PDF: {os.path.basename(pdf_path)} ---")
+    try: doc = fitz.open(pdf_path)
+    except Exception as e:
+        logging.error(f"FATAL: Could not open {pdf_path}. Reason: {e}")
+        return None
         
-        if not font_sizes:
-            return {"title": "Untitled Document", "outline": []}
+    result = get_outline_from_toc(doc)
+    
+    if result is None:
+        title, outline = reconstruct_document_from_layout(doc)
+    else:
+        title, outline = result
 
-        body_size = max(font_sizes, key=font_sizes.get)
-        potential_heading_sizes = [s for s in font_sizes if s > body_size * HEADING_SIZE_FACTOR]
-        potential_heading_sizes.sort(reverse=True)
-        heading_sizes = potential_heading_sizes[:HEADING_LEVELS]
-        size_to_level = {size: f"H{i+1}" for i, size in enumerate(heading_sizes)}
+    doc.close()
+    return {"title": title, "outline": outline if outline else []}
 
-        title_text = "Untitled Document"
-        for line in all_lines:
-             if line['page'] <= 1 and round(line['size']) >= (heading_sizes[0] if heading_sizes else body_size * 1.5):
-                if 'perspectives' in line['text'].lower() or 'journal' in line['text'].lower():
-                    title_text = line['text']
-                    break
-
-        outline = []
-        for line in all_lines:
-            font_size = round(line['size'])
-            if font_size in size_to_level and is_valid_heading(line['text']):
-                outline.append({
-                    "level": size_to_level[font_size],
-                    "text": line['text'],
-                    "page": line['page']
-                })
-        
-        final_outline = consolidate_outline(outline)
-        result = {"title": title_text, "outline": final_outline}
-        
-    return result
-
-if __name__ == "__main__":
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    for filename in os.listdir(INPUT_DIR):
+def main(input_dir: str, output_dir: str):
+    """Main function to find and process all PDFs."""
+    if not os.path.exists(output_dir): os.makedirs(output_dir)
+    print(f"Starting processing. See {logging.getLogger().handlers[0].baseFilename} for details.")
+    for filename in sorted(os.listdir(input_dir)):
         if filename.lower().endswith(".pdf"):
-            pdf_path = os.path.join(INPUT_DIR, filename)
-            output_path = os.path.join(OUTPUT_DIR, os.path.splitext(filename)[0] + ".json")
-            print(f"Processing {pdf_path}...")
-            try:
-                data = process_pdf(pdf_path)
-                with open(output_path, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-                print(f"Successfully generated {output_path}")
-            except Exception as e:
-                print(f"Error processing {pdf_path}: {e}")
-    print("Processing complete.")
+            pdf_path = os.path.join(input_dir, filename)
+            print(f"Processing: {filename}")
+            data = process_pdf(pdf_path)
+            if data:
+                json_path = os.path.join(output_dir, os.path.splitext(filename)[0] + ".json")
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=4)
+                print(f"  -> SUCCESS: Created {os.path.basename(json_path)}")
+
+if __name__ == '__main__':
+    main(input_dir='./input', output_dir='./output')
+    print("\nProcessing complete.")

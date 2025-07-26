@@ -1,0 +1,13 @@
+INFO: --- Processing PDF: file01.pdf ---
+WARNING: For 'file01.pdf', no bookmarks found or call to library failed.
+WARNING: For 'file01.pdf', executing ADVANCED layout reconstruction.
+INFO: --- Processing PDF: file02.pdf ---
+WARNING: For 'file02.pdf', no bookmarks found or call to library failed.
+WARNING: For 'file02.pdf', executing ADVANCED layout reconstruction.
+INFO: --- Processing PDF: file03.pdf ---
+WARNING: For 'file03.pdf', no bookmarks found or call to library failed.
+WARNING: For 'file03.pdf', executing ADVANCED layout reconstruction.
+INFO: --- Processing PDF: file04.pdf ---
+INFO: For 'file04.pdf', SUCCESS: Found bookmarks. Using high-fidelity TOC strategy.
+INFO: --- Processing PDF: file05.pdf ---
+INFO: For 'file05.pdf', SUCCESS: Found bookmarks. Using high-fidelity TOC strategy.

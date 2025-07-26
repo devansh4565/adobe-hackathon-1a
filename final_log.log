@@ -1,0 +1,8 @@
+WARNING: For 'file01.pdf', no bookmarks found or call failed.
+WARNING: For 'file01.pdf', executing ADVANCED layout analysis fallback.
+WARNING: For 'file02.pdf', no bookmarks found or call failed.
+WARNING: For 'file02.pdf', executing ADVANCED layout analysis fallback.
+WARNING: For 'file03.pdf', no bookmarks found or call failed.
+WARNING: For 'file03.pdf', executing ADVANCED layout analysis fallback.
+INFO: For 'file04.pdf', SUCCESS: Found bookmarks. Using high-fidelity TOC strategy.
+INFO: For 'file05.pdf', SUCCESS: Found bookmarks. Using high-fidelity TOC strategy.

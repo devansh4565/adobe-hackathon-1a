@@ -1,29 +1,28 @@
-# --- Stage 1: The Builder ---
-# This stage installs dependencies into a temporary location.
-FROM python:3.9-slim AS builder
+# Use a slim Python image for smaller size
+FROM python:3.10-slim-bookworm
 
-WORKDIR /install
-
-# Copy requirements first to leverage Docker cache
-COPY requirements.txt .
-
-# Install dependencies into the target directory, not the system directory
-RUN pip install --no-cache-dir --target=/install -r requirements.txt
-
-
-# --- Stage 2: The Final Image ---
-# This stage builds the lean, final image.
-FROM python:3.9-slim
-
-# Add the installed packages to Python's path
-ENV PYTHONPATH=/install
-
+# Set the working directory inside the container
 WORKDIR /app
 
-# Copy only the installed packages from the builder stage
-COPY --from=builder /install /install
-# Copy the main application script
+# Install system dependencies required by PyMuPDF
+# libmupdf-dev provides the necessary MuPDF libraries
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libmupdf-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the requirements file and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy your application code into the container
 COPY main.py .
 
-# Command to run the script automatically
+# Create input and output directories
+RUN mkdir -p input output
+
+# Command to run the application
+# This command will be executed when the container starts.
+# It expects PDFs in /app/input and will write JSONs to /app/output.
+# The script should iterate through all PDFs in the input directory.
 CMD ["python", "main.py"]
